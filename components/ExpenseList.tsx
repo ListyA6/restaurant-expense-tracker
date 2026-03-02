@@ -21,7 +21,7 @@ interface ExpenseListProps {
   user: User
 }
 
-type FilterPeriod = 'today' | 'week' | 'month' | 'all'
+type FilterPeriod = 'today' | 'week' | 'month' | 'all' | 'custom'
 
 // Define Expense type locally to avoid import issues
 interface Expense {
@@ -47,12 +47,15 @@ export default function ExpenseList({ user }: ExpenseListProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [totalAmount, setTotalAmount] = useState(0)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [showCustomDate, setShowCustomDate] = useState(false)
+  const [customStartDate, setCustomStartDate] = useState('')
+  const [customEndDate, setCustomEndDate] = useState('')
 
   useEffect(() => {
     if (user.role === 'admin') {
       loadExpenses()
     }
-  }, [filterPeriod, user.role])
+  }, [filterPeriod, customStartDate, customEndDate, user.role])
 
   const loadExpenses = async () => {
     setLoading(true)
@@ -70,7 +73,11 @@ export default function ExpenseList({ user }: ExpenseListProps) {
       const now = new Date()
       const today = now.toISOString().split('T')[0]
       
-      if (filterPeriod === 'today') {
+      if (filterPeriod === 'custom' && customStartDate && customEndDate) {
+        query = query
+          .gte('date', customStartDate)
+          .lte('date', customEndDate)
+      } else if (filterPeriod === 'today') {
         query = query.eq('date', today)
       } else if (filterPeriod === 'week') {
         const weekAgo = new Date(now.setDate(now.getDate() - 7)).toISOString().split('T')[0]
@@ -98,50 +105,50 @@ export default function ExpenseList({ user }: ExpenseListProps) {
   }
 
   const handleDelete = async (expenseId: string) => {
-  if (!confirm('Yakin ingin menghapus pengeluaran ini?')) return
+    if (!confirm('Yakin ingin menghapus pengeluaran ini?')) return
 
-  setDeletingId(expenseId)
-  try {
-    // FIRST: Get complete expense details before deleting
-    const { data: expense, error: fetchError } = await supabase
-      .from('expenses')
-      .select('*')
-      .eq('id', expenseId)
-      .single()
+    setDeletingId(expenseId)
+    try {
+      // FIRST: Get complete expense details before deleting
+      const { data: expense, error: fetchError } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('id', expenseId)
+        .single()
 
-    if (fetchError) throw fetchError
+      if (fetchError) throw fetchError
 
-    // SECOND: Delete the expense
-    const { error: deleteError } = await supabase
-      .from('expenses')
-      .delete()
-      .eq('id', expenseId)
+      // SECOND: Delete the expense
+      const { error: deleteError } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', expenseId)
 
-    if (deleteError) throw deleteError
+      if (deleteError) throw deleteError
 
-    // THIRD: Log the deletion with ALL details
-    if (expense) {
-      await logAction('DELETE', expenseId, user.id, {
-        description: expense.description,
-        amount: expense.amount,
-        category: expense.category,
-        unit: expense.unit || '',
-        cashier_source: expense.cashier_source,
-        date: expense.date,
-        itemName: expense.description, // Add this for consistency
-        deletedAt: new Date().toISOString()
-      })
+      // THIRD: Log the deletion with ALL details
+      if (expense) {
+        await logAction('DELETE', expenseId, user.id, {
+          description: expense.description,
+          amount: expense.amount,
+          category: expense.category,
+          unit: expense.unit || '',
+          cashier_source: expense.cashier_source,
+          date: expense.date,
+          itemName: expense.description,
+          deletedAt: new Date().toISOString()
+        })
+      }
+
+      toast.success('Pengeluaran dihapus')
+      loadExpenses()
+    } catch (error: any) {
+      console.error('Delete error:', error)
+      toast.error(error.message || 'Gagal menghapus')
+    } finally {
+      setDeletingId(null)
     }
-
-    toast.success('Pengeluaran dihapus')
-    loadExpenses()
-  } catch (error: any) {
-    console.error('Delete error:', error)
-    toast.error(error.message || 'Gagal menghapus')
-  } finally {
-    setDeletingId(null)
   }
-}
 
   // Filter by search and category
   const filteredExpenses = expenses.filter(expense => {
@@ -190,7 +197,7 @@ export default function ExpenseList({ user }: ExpenseListProps) {
 
   return (
     <div className="max-w-4xl mx-auto p-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
         {/* Header with Summary */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
           <div className="flex justify-between items-center">
@@ -205,62 +212,81 @@ export default function ExpenseList({ user }: ExpenseListProps) {
           </div>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="border-b border-gray-200">
-          <div className="flex">
-            <button
-              onClick={() => setFilterPeriod('today')}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors
-                ${filterPeriod === 'today' 
-                  ? 'text-blue-600 border-b-2 border-blue-600' 
-                  : 'text-gray-500 hover:text-gray-700'
-                }`}
-            >
-              Hari Ini
-            </button>
-            <button
-              onClick={() => setFilterPeriod('week')}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors
-                ${filterPeriod === 'week' 
-                  ? 'text-blue-600 border-b-2 border-blue-600' 
-                  : 'text-gray-500 hover:text-gray-700'
-                }`}
-            >
-              1 Minggu
-            </button>
-            <button
-              onClick={() => setFilterPeriod('month')}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors
-                ${filterPeriod === 'month' 
-                  ? 'text-blue-600 border-b-2 border-blue-600' 
-                  : 'text-gray-500 hover:text-gray-700'
-                }`}
-            >
-              1 Bulan
-            </button>
-            <button
-              onClick={() => setFilterPeriod('all')}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors
-                ${filterPeriod === 'all' 
-                  ? 'text-blue-600 border-b-2 border-blue-600' 
-                  : 'text-gray-500 hover:text-gray-700'
-                }`}
-            >
-              Semua
-            </button>
+        {/* Filter Section */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 space-y-3">
+          {/* Quick Filter Tabs */}
+          <div className="flex gap-2">
+            {(['today', 'week', 'month', 'all'] as const).map((range) => (
+              <button
+                key={range}
+                onClick={() => {
+                  setFilterPeriod(range)
+                  setShowCustomDate(false)
+                  setCustomStartDate('')
+                  setCustomEndDate('')
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex-1
+                  ${filterPeriod === range && !customStartDate
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+              >
+                {range === 'today' ? 'Hari Ini' : 
+                 range === 'week' ? 'Minggu Ini' : 
+                 range === 'month' ? 'Bulan Ini' : 'Semua'}
+              </button>
+            ))}
           </div>
-        </div>
 
-        {/* Search Bar */}
-        <div className="p-4">
+          {/* Custom Date Toggle */}
+          <div>
+            <button
+              onClick={() => setShowCustomDate(!showCustomDate)}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1"
+            >
+              <Calendar className="w-4 h-4" />
+              {showCustomDate ? 'Sembunyikan' : 'Pilih'} Tanggal Tertentu
+            </button>
+            
+            {showCustomDate && (
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Dari</label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => {
+                      setCustomStartDate(e.target.value)
+                      setFilterPeriod('custom')
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Sampai</label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => {
+                      setCustomEndDate(e.target.value)
+                      setFilterPeriod('custom')
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Search Bar */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
               placeholder="Cari pengeluaran..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-gray-900"
+              className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none dark:bg-gray-700 dark:text-white"
             />
           </div>
         </div>
@@ -275,7 +301,7 @@ export default function ExpenseList({ user }: ExpenseListProps) {
                 className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors
                   ${selectedCategory === cat
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
               >
                 {cat === 'all' ? 'Semua' : cat}
@@ -294,29 +320,29 @@ export default function ExpenseList({ user }: ExpenseListProps) {
             Tidak ada pengeluaran
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-gray-100 dark:divide-gray-700">
             {filteredExpenses.map((expense) => (
-              <div key={expense.id} className="p-4 hover:bg-gray-50 transition-colors">
+              <div key={expense.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                 <div className="flex justify-between items-start gap-4">
                   {/* Left side - Details */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       {getCategoryIcon(expense.category)}
-                      <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">
                         {expense.category}
                       </span>
                       {expense.unit && (
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-gray-400 dark:text-gray-500">
                           {expense.unit}
                         </span>
                       )}
                     </div>
                     
-                    <h3 className="font-medium text-gray-900 mb-1 break-words">
+                    <h3 className="font-medium text-gray-900 dark:text-white mb-1 break-words">
                       {expense.description || 'Tanpa keterangan'}
                     </h3>
                     
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                    <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
                         {formatDate(expense.date)}
@@ -333,7 +359,7 @@ export default function ExpenseList({ user }: ExpenseListProps) {
 
                   {/* Right side - Amount and Delete */}
                   <div className="flex items-center gap-3">
-                    <span className="font-semibold text-gray-900 whitespace-nowrap">
+                    <span className="font-semibold text-gray-900 dark:text-white whitespace-nowrap">
                       Rp {formatCurrency(expense.amount)}
                     </span>
                     
@@ -341,7 +367,7 @@ export default function ExpenseList({ user }: ExpenseListProps) {
                     <button
                       onClick={() => handleDelete(expense.id)}
                       disabled={deletingId === expense.id}
-                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                      className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -353,8 +379,8 @@ export default function ExpenseList({ user }: ExpenseListProps) {
         )}
 
         {/* Footer with count */}
-        <div className="bg-gray-50 px-4 py-3 border-t border-gray-100">
-          <p className="text-sm text-gray-600">
+        <div className="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Menampilkan {filteredExpenses.length} dari {expenses.length} pengeluaran
           </p>
         </div>
