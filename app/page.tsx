@@ -8,14 +8,15 @@ import AdminDashboard from '@/components/AdminDashboard'
 import AuditLog from '@/components/AuditLog'
 import ExportButtons from '@/components/ExportButtons'
 import DailyReportForm from '@/components/DailyReportForm'
+import DailyReportList from '@/components/DailyReportList'
 import ThemeToggle from '@/components/ThemeToggle'
 import { User } from '@/types'
-import { LayoutDashboard, ListTodo, History, Download, FileText } from 'lucide-react'
+import { LayoutDashboard, ListTodo, History, Download, FileText, ClipboardList } from 'lucide-react'
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [activeTab, setActiveTab] = useState<'form' | 'dashboard' | 'audit' | 'export' | 'daily'>('form')
+  const [activeTab, setActiveTab] = useState<'form' | 'dashboard' | 'audit' | 'export' | 'daily' | 'daily-list'>('daily')
 
   useEffect(() => {
     const savedUser = localStorage.getItem('currentUser')
@@ -72,7 +73,7 @@ export default function Home() {
       <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-4 overflow-x-auto pb-0.5">
-            {/* Daily Report Tab - Available to EVERYONE (admin and cashiers) */}
+            {/* Daily Report Input Tab - Available to EVERYONE */}
             <button
               onClick={() => setActiveTab('daily')}
               className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
@@ -82,12 +83,23 @@ export default function Home() {
                 }`}
             >
               <FileText className="w-4 h-4" />
-              Laporan Harian
+              Input Laporan
             </button>
 
             {/* Admin-only tabs */}
             {user.role === 'admin' && (
               <>
+                <button
+                  onClick={() => setActiveTab('daily-list')}
+                  className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
+                    ${activeTab === 'daily-list'
+                      ? 'border-green-600 text-green-600 dark:text-green-400 dark:border-green-400'
+                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                >
+                  <ClipboardList className="w-4 h-4" />
+                  Riwayat Laporan
+                </button>
                 <button
                   onClick={() => setActiveTab('form')}
                   className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
@@ -140,6 +152,7 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="py-4">
+        {/* Daily Report Input - Available to everyone */}
         {activeTab === 'daily' && (
           <DailyReportForm 
             user={user} 
@@ -147,8 +160,12 @@ export default function Home() {
           />
         )}
 
+        {/* Admin-only content */}
         {user.role === 'admin' && (
           <>
+            {activeTab === 'daily-list' && (
+              <DailyReportList user={user} />
+            )}
             {activeTab === 'form' && (
               <>
                 <ExpenseForm user={user} onExpenseAdded={handleExpenseAdded} />
