@@ -15,8 +15,11 @@ import {
   Save,
   AlertCircle,
   Wallet,
-  Banknote
+  Landmark,
+  CheckCircle,
+  XCircle
 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface DailyReportFormProps {
   user: User
@@ -34,10 +37,12 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [existingReport, setExistingReport] = useState<any>(null)
-  
-  // New states for expense tracking
   const [kasirExpenses, setKasirExpenses] = useState(0)
   const [kasExpenses, setKasExpenses] = useState(0)
+  
+  // Confirmation modal state
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [pendingData, setPendingData] = useState<any>(null)
 
   // Load data when date changes
   useEffect(() => {
@@ -111,28 +116,36 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
       return
     }
 
+    // Calculate summary for confirmation
+    const cash = parseFloat(cashAmount) || 0
+    const gofood = parseFloat(gofoodAmount) || 0
+    const shopee = parseFloat(shopeeAmount) || 0
+    const qris = parseFloat(qrisAmount) || 0
+    const other = parseFloat(otherDigitalAmount) || 0
+    const pos = parseFloat(posTotal) || 0
+
+    const totalDigital = gofood + shopee + qris + other
+    const cashIncome = pos - totalDigital
+    const expectedCash = cashIncome - kasirExpenses
+    const cashDifference = cash - expectedCash
+
+    // Show confirmation modal
+    setPendingData({
+      cash, gofood, shopee, qris, other, pos,
+      totalDigital, cashIncome, expectedCash, cashDifference,
+      notes
+    })
+    setShowConfirmModal(true)
+  }
+
+  const confirmSave = async () => {
+    if (!pendingData) return
+    
     setLoading(true)
+    setShowConfirmModal(false)
 
     try {
-      const cash = parseFloat(cashAmount) || 0
-      const gofood = parseFloat(gofoodAmount) || 0
-      const shopee = parseFloat(shopeeAmount) || 0
-      const qris = parseFloat(qrisAmount) || 0
-      const other = parseFloat(otherDigitalAmount) || 0
-      const pos = parseFloat(posTotal) || 0
-
-      // Calculate digital total
-      const totalDigital = gofood + shopee + qris + other
-      
-      // Cash that should be in drawer:
-      // Cash Income = POS Total - Digital Payments
-      const cashIncome = pos - totalDigital
-      
-      // Expected cash in drawer = Cash Income - Expenses from KASIR
-      const expectedCash = cashIncome - kasirExpenses
-      
-      // Cash difference = Actual cash - Expected cash
-      const cashDifference = cash - expectedCash
+      const { cash, gofood, shopee, qris, other, pos, notes } = pendingData
 
       const reportData = {
         date,
@@ -142,10 +155,8 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
         qris_amount: qris,
         other_digital_amount: other,
         pos_total: pos,
-        kasir_expenses: kasirExpenses,  // Save for reference
-        kas_expenses: kasExpenses,      // Save for reference
-        expected_cash: expectedCash,     // Save calculation
-        cash_difference: cashDifference, // Save difference
+        kasir_expenses: kasirExpenses,
+        kas_expenses: kasExpenses,
         notes
       }
 
@@ -172,6 +183,7 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
       }
 
       // Show cash difference result
+      const { cashDifference } = pendingData
       if (cashDifference > 0) {
         toast.success(`💰 Kelebihan di laci: Rp ${formatCurrency(Math.abs(cashDifference))}`)
       } else if (cashDifference < 0) {
@@ -186,6 +198,7 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
       toast.error(error.message || 'Gagal menyimpan laporan')
     } finally {
       setLoading(false)
+      setPendingData(null)
     }
   }
 
@@ -289,7 +302,6 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                   <ShoppingBag className="w-3 h-3 inline mr-1" />
@@ -307,7 +319,6 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                   <QrCode className="w-3 h-3 inline mr-1" />
@@ -325,7 +336,6 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                   <MoreHorizontal className="w-3 h-3 inline mr-1" />
@@ -370,7 +380,7 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
             <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-xl">
               <div className="flex items-center gap-1 text-sm text-orange-700 dark:text-orange-300 mb-1">
                 <Wallet className="w-4 h-4" />
-                Expense dari KASIR
+                Expense KASIR
               </div>
               <div className="font-semibold text-orange-700 dark:text-orange-300">
                 Rp {formatCurrency(kasirExpenses)}
@@ -378,8 +388,8 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
             </div>
             <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl">
               <div className="flex items-center gap-1 text-sm text-blue-700 dark:text-blue-300 mb-1">
-                <Banknote className="w-4 h-4" />
-                Expense dari KAS
+                <Landmark className="w-4 h-4" />
+                Expense KAS
               </div>
               <div className="font-semibold text-blue-700 dark:text-blue-300">
                 Rp {formatCurrency(kasExpenses)}
@@ -408,7 +418,7 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
             </div>
             
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Expense dari KASIR:</span>
+              <span className="text-gray-600 dark:text-gray-400">Expense KASIR:</span>
               <span className="font-medium text-red-600">- Rp {formatCurrency(kasirExpenses)}</span>
             </div>
             <div className="flex justify-between text-sm border-b border-gray-200 dark:border-gray-600 pb-2">
@@ -430,21 +440,6 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
                 {cashDifference > 0 ? ' (Kelebihan)' : cashDifference < 0 ? ' (Kekurangan)' : ''}
               </span>
             </div>
-          </div>
-
-          {/* Main Safe Summary */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl">
-            <h3 className="font-medium text-sm mb-2 flex items-center gap-1">
-              <Banknote className="w-4 h-4" />
-              Brankas (KAS)
-            </h3>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Total Expense dari KAS:</span>
-              <span className="font-medium">Rp {formatCurrency(kasExpenses)}</span>
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              * Expense dari KAS tidak mempengaruhi uang di laci kasir
-            </p>
           </div>
 
           {/* Notes */}
@@ -478,6 +473,102 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
           )}
         </form>
       </div>
+
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {showConfirmModal && pendingData && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+            onClick={() => setShowConfirmModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+                Konfirmasi Laporan
+              </h3>
+
+              <div className="space-y-3 mb-6">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Tanggal:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {new Date(date).toLocaleDateString('id-ID', { 
+                      day: 'numeric', 
+                      month: 'long', 
+                      year: 'numeric' 
+                    })}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Omset:</span>
+                  <span className="font-medium">Rp {formatCurrency(pendingData.pos)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Total Digital:</span>
+                  <span className="font-medium">Rp {formatCurrency(pendingData.totalDigital)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Uang Tunai Masuk:</span>
+                  <span className="font-medium">Rp {formatCurrency(pendingData.cashIncome)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Expense KASIR:</span>
+                  <span className="font-medium text-red-600">- Rp {formatCurrency(kasirExpenses)}</span>
+                </div>
+                <div className="flex justify-between text-sm border-t border-gray-200 pt-2">
+                  <span className="text-gray-600 dark:text-gray-400 font-medium">Seharusnya di Laci:</span>
+                  <span className="font-medium">Rp {formatCurrency(pendingData.expectedCash)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400 font-medium">Uang Aktual:</span>
+                  <span className="font-medium">Rp {formatCurrency(pendingData.cash)}</span>
+                </div>
+                <div className={`flex justify-between text-sm font-bold ${differenceColor}`}>
+                  <span className="flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    Selisih:
+                  </span>
+                  <span>
+                    {pendingData.cashDifference > 0 ? '+' : ''}
+                    Rp {formatCurrency(Math.abs(pendingData.cashDifference))}
+                    {pendingData.cashDifference > 0 ? ' (Kelebihan)' : pendingData.cashDifference < 0 ? ' (Kekurangan)' : ''}
+                  </span>
+                </div>
+                {pendingData.notes && (
+                  <div className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded">
+                    📝 {pendingData.notes}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowConfirmModal(false)}
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <XCircle className="w-4 h-4" />
+                  Batal
+                </button>
+                <button
+                  onClick={confirmSave}
+                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Konfirmasi
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
