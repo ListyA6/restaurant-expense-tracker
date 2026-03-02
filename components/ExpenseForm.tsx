@@ -87,7 +87,8 @@ const unitTypes = [
   { id: 'jirigen', label: 'Jirigen', icon: Droplets },
   { id: 'pack', label: 'Pack', icon: Package },
   { id: 'ikat', label: 'Ikat', icon: Package },
-  { id: 'bungkus', label: 'Bungkus', icon: Package }
+  { id: 'bungkus', label: 'Bungkus', icon: Package },
+  { id: 'sak', label: 'Sak (Karung)', icon: Package }  // Added sak/karung
 ]
 
 export default function ExpenseForm({ user, onExpenseAdded }: ExpenseFormProps) {
