@@ -13,7 +13,9 @@ import {
   Calculator,
   FileText,
   Save,
-  AlertCircle
+  AlertCircle,
+  Wallet,
+  Banknote
 } from 'lucide-react'
 
 interface DailyReportFormProps {
@@ -32,25 +34,43 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [existingReport, setExistingReport] = useState<any>(null)
-  const [todayExpenses, setTodayExpenses] = useState(0)
+  
+  // New states for expense tracking
+  const [kasirExpenses, setKasirExpenses] = useState(0)
+  const [kasExpenses, setKasExpenses] = useState(0)
 
-  // Load today's expenses for reference
+  // Load data when date changes
   useEffect(() => {
-    loadTodayExpenses()
+    loadExpenses()
     checkExistingReport()
   }, [date])
 
-  const loadTodayExpenses = async () => {
+  const loadExpenses = async () => {
     try {
-      const { data, error } = await supabase
+      // Load expenses from KASIR (cash drawer)
+      const { data: kasirData, error: kasirError } = await supabase
         .from('expenses')
         .select('amount')
         .eq('date', date)
+        .eq('cashier_source', 'Kasir')
 
-      if (error) throw error
+      if (kasirError) throw kasirError
       
-      const total = (data || []).reduce((sum, exp) => sum + exp.amount, 0)
-      setTodayExpenses(total)
+      const kasirTotal = (kasirData || []).reduce((sum, exp) => sum + exp.amount, 0)
+      setKasirExpenses(kasirTotal)
+
+      // Load expenses from KAS (main safe)
+      const { data: kasData, error: kasError } = await supabase
+        .from('expenses')
+        .select('amount')
+        .eq('date', date)
+        .eq('cashier_source', 'Kas')
+
+      if (kasError) throw kasError
+      
+      const kasTotal = (kasData || []).reduce((sum, exp) => sum + exp.amount, 0)
+      setKasExpenses(kasTotal)
+
     } catch (error) {
       console.error('Error loading expenses:', error)
     }
@@ -101,23 +121,39 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
       const other = parseFloat(otherDigitalAmount) || 0
       const pos = parseFloat(posTotal) || 0
 
+      // Calculate digital total
       const totalDigital = gofood + shopee + qris + other
-      const totalSeharusnya = cash + totalDigital
-      const selisih = totalSeharusnya - pos
+      
+      // Cash that should be in drawer:
+      // Cash Income = POS Total - Digital Payments
+      const cashIncome = pos - totalDigital
+      
+      // Expected cash in drawer = Cash Income - Expenses from KASIR
+      const expectedCash = cashIncome - kasirExpenses
+      
+      // Cash difference = Actual cash - Expected cash
+      const cashDifference = cash - expectedCash
+
+      const reportData = {
+        date,
+        cash_amount: cash,
+        gofood_amount: gofood,
+        shopee_amount: shopee,
+        qris_amount: qris,
+        other_digital_amount: other,
+        pos_total: pos,
+        kasir_expenses: kasirExpenses,  // Save for reference
+        kas_expenses: kasExpenses,      // Save for reference
+        expected_cash: expectedCash,     // Save calculation
+        cash_difference: cashDifference, // Save difference
+        notes
+      }
 
       if (existingReport) {
         // Update existing report
         const { error } = await supabase
           .from('daily_reports')
-          .update({
-            cash_amount: cash,
-            gofood_amount: gofood,
-            shopee_amount: shopee,
-            qris_amount: qris,
-            other_digital_amount: other,
-            pos_total: pos,
-            notes
-          })
+          .update(reportData)
           .eq('id', existingReport.id)
 
         if (error) throw error
@@ -127,14 +163,7 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
         const { error } = await supabase
           .from('daily_reports')
           .insert([{
-            date,
-            cash_amount: cash,
-            gofood_amount: gofood,
-            shopee_amount: shopee,
-            qris_amount: qris,
-            other_digital_amount: other,
-            pos_total: pos,
-            notes,
+            ...reportData,
             created_by: user.id
           }])
 
@@ -142,17 +171,18 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
         toast.success('Laporan harian disimpan!')
       }
 
-      // Show selisih info
-      if (selisih > 0) {
-        toast.success(`💰 Kelebihan: Rp ${formatCurrency(selisih)}`)
-      } else if (selisih < 0) {
-        toast.error(`💸 Kekurangan: Rp ${formatCurrency(Math.abs(selisih))}`)
+      // Show cash difference result
+      if (cashDifference > 0) {
+        toast.success(`💰 Kelebihan di laci: Rp ${formatCurrency(Math.abs(cashDifference))}`)
+      } else if (cashDifference < 0) {
+        toast.error(`💸 Kekurangan di laci: Rp ${formatCurrency(Math.abs(cashDifference))}`)
       } else {
-        toast.success('✅ Pas! Tidak ada selisih')
+        toast.success('✅ Uang di laci pas!')
       }
 
       onReportSubmitted?.()
     } catch (error: any) {
+      console.error('Submit error:', error)
       toast.error(error.message || 'Gagal menyimpan laporan')
     } finally {
       setLoading(false)
@@ -168,7 +198,7 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
     setter(raw)
   }
 
-  // Calculate digital total and selisih
+  // Calculate values for display
   const cash = parseFloat(cashAmount) || 0
   const gofood = parseFloat(gofoodAmount) || 0
   const shopee = parseFloat(shopeeAmount) || 0
@@ -177,9 +207,10 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
   const pos = parseFloat(posTotal) || 0
   
   const totalDigital = gofood + shopee + qris + other
-  const totalSeharusnya = cash + totalDigital
-  const selisih = totalSeharusnya - pos
-  const selisihColor = selisih > 0 ? 'text-green-600' : selisih < 0 ? 'text-red-600' : 'text-gray-600'
+  const cashIncome = pos - totalDigital
+  const expectedCash = cashIncome - kasirExpenses
+  const cashDifference = cash - expectedCash
+  const differenceColor = cashDifference > 0 ? 'text-green-600' : cashDifference < 0 ? 'text-red-600' : 'text-gray-600'
 
   return (
     <div className="max-w-2xl mx-auto p-4">
@@ -217,21 +248,11 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
             </div>
           )}
 
-          {/* Today's Expenses (for reference) */}
-          <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-blue-700 dark:text-blue-300">Total Pengeluaran Hari Ini:</span>
-              <span className="font-semibold text-blue-700 dark:text-blue-300">
-                Rp {formatCurrency(todayExpenses)}
-              </span>
-            </div>
-          </div>
-
-          {/* Cash Input */}
+          {/* Cash Drawer Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-              <DollarSign className="w-4 h-4 text-green-600" />
-              Uang Tunai di Kas *
+              <Wallet className="w-4 h-4 text-green-600" />
+              Uang Tunai di Laci (KASIR) *
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">Rp</span>
@@ -344,30 +365,87 @@ export default function DailyReportForm({ user, onReportSubmitted }: DailyReport
             </div>
           </div>
 
-          {/* Calculation Summary */}
-          {(cashAmount || gofoodAmount || shopeeAmount || qrisAmount || otherDigitalAmount || posTotal) && (
-            <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Total Digital:</span>
-                <span className="font-medium">Rp {formatCurrency(totalDigital)}</span>
+          {/* Expense Summary */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-xl">
+              <div className="flex items-center gap-1 text-sm text-orange-700 dark:text-orange-300 mb-1">
+                <Wallet className="w-4 h-4" />
+                Expense dari KASIR
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Tunai + Digital:</span>
-                <span className="font-medium">Rp {formatCurrency(totalSeharusnya)}</span>
-              </div>
-              <div className="flex justify-between text-sm font-semibold border-t border-gray-200 dark:border-gray-600 pt-2">
-                <span className="flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4" />
-                  Selisih:
-                </span>
-                <span className={selisihColor}>
-                  {selisih > 0 ? '+' : ''}{selisih !== 0 ? `Rp ${formatCurrency(Math.abs(selisih))}` : 'Rp 0'}
-                  {selisih > 0 && ' (Kelebihan)'}
-                  {selisih < 0 && ' (Kekurangan)'}
-                </span>
+              <div className="font-semibold text-orange-700 dark:text-orange-300">
+                Rp {formatCurrency(kasirExpenses)}
               </div>
             </div>
-          )}
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl">
+              <div className="flex items-center gap-1 text-sm text-blue-700 dark:text-blue-300 mb-1">
+                <Banknote className="w-4 h-4" />
+                Expense dari KAS
+              </div>
+              <div className="font-semibold text-blue-700 dark:text-blue-300">
+                Rp {formatCurrency(kasExpenses)}
+              </div>
+            </div>
+          </div>
+
+          {/* Cash Drawer Calculation */}
+          <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl space-y-2">
+            <h3 className="font-medium text-sm mb-2 flex items-center gap-1">
+              <Wallet className="w-4 h-4" />
+              Perhitungan Laci Kas (KASIR)
+            </h3>
+            
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Omset POS:</span>
+              <span className="font-medium">Rp {formatCurrency(pos)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Pembayaran Digital:</span>
+              <span className="font-medium text-blue-600">- Rp {formatCurrency(totalDigital)}</span>
+            </div>
+            <div className="flex justify-between text-sm border-b border-gray-200 dark:border-gray-600 pb-2">
+              <span className="text-gray-600 dark:text-gray-400">Uang Tunai Masuk:</span>
+              <span className="font-medium">Rp {formatCurrency(cashIncome)}</span>
+            </div>
+            
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Expense dari KASIR:</span>
+              <span className="font-medium text-red-600">- Rp {formatCurrency(kasirExpenses)}</span>
+            </div>
+            <div className="flex justify-between text-sm border-b border-gray-200 dark:border-gray-600 pb-2">
+              <span className="text-gray-600 dark:text-gray-400">Seharusnya di Laci:</span>
+              <span className="font-medium">Rp {formatCurrency(expectedCash)}</span>
+            </div>
+            
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Aktual di Laci:</span>
+              <span className="font-medium">Rp {formatCurrency(cash)}</span>
+            </div>
+            <div className="flex justify-between text-sm font-semibold">
+              <span className="flex items-center gap-1">
+                <AlertCircle className="w-4 h-4" />
+                Selisih Laci:
+              </span>
+              <span className={differenceColor}>
+                {cashDifference > 0 ? '+' : ''}{cashDifference !== 0 ? `Rp ${formatCurrency(Math.abs(cashDifference))}` : 'Rp 0'}
+                {cashDifference > 0 ? ' (Kelebihan)' : cashDifference < 0 ? ' (Kekurangan)' : ''}
+              </span>
+            </div>
+          </div>
+
+          {/* Main Safe Summary */}
+          <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl">
+            <h3 className="font-medium text-sm mb-2 flex items-center gap-1">
+              <Banknote className="w-4 h-4" />
+              Brankas (KAS)
+            </h3>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Total Expense dari KAS:</span>
+              <span className="font-medium">Rp {formatCurrency(kasExpenses)}</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              * Expense dari KAS tidak mempengaruhi uang di laci kasir
+            </p>
+          </div>
 
           {/* Notes */}
           <div>
