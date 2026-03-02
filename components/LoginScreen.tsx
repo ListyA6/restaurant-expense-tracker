@@ -53,9 +53,9 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Restaurant Expense Tracker
+            Pengeluaran Lalafun 🍗
           </h1>
-          <p className="text-gray-600">Select your name to continue</p>
+          <p className="text-gray-600">Kamu Siapa?</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -89,7 +89,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         </div>
 
         <p className="text-center mt-8 text-sm text-gray-500">
-          Choose your name to login • Admin can add new users
+          tolong nota dikasihkan ke pihak pencatatan
         </p>
       </div>
     </div>
