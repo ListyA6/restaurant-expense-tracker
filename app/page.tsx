@@ -16,7 +16,7 @@ import { LayoutDashboard, ListTodo, History, Download, FileText, ClipboardList }
 export default function Home() {
   const [user, setUser] = useState<User | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [activeTab, setActiveTab] = useState<'form' | 'dashboard' | 'audit' | 'export' | 'daily' | 'daily-list'>('daily')
+  const [activeTab, setActiveTab] = useState<'daily' | 'form' | 'daily-list' | 'dashboard' | 'audit' | 'export'>('daily')
 
   useEffect(() => {
     const savedUser = localStorage.getItem('currentUser')
@@ -52,7 +52,7 @@ export default function Home() {
       <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Restaurant Expense Tracker
+            Laporan Lalafun 🍗
           </h1>
           <div className="flex items-center space-x-4">
             <ThemeToggle />
@@ -69,11 +69,11 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Tabs - Different for admin vs cashier */}
+      {/* Tabs - Everyone sees these basic tabs */}
       <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-4 overflow-x-auto pb-0.5">
-            {/* Daily Report Input Tab - Available to EVERYONE */}
+            {/* Daily Report Tab - Everyone */}
             <button
               onClick={() => setActiveTab('daily')}
               className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
@@ -83,7 +83,20 @@ export default function Home() {
                 }`}
             >
               <FileText className="w-4 h-4" />
-              Input Laporan
+              Laporan Harian
+            </button>
+
+            {/* Expense Input Tab - Everyone (Kasir can input expenses) */}
+            <button
+              onClick={() => setActiveTab('form')}
+              className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
+                ${activeTab === 'form'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+            >
+              <ListTodo className="w-4 h-4" />
+              Input Pengeluaran
             </button>
 
             {/* Admin-only tabs */}
@@ -99,17 +112,6 @@ export default function Home() {
                 >
                   <ClipboardList className="w-4 h-4" />
                   Riwayat Laporan
-                </button>
-                <button
-                  onClick={() => setActiveTab('form')}
-                  className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
-                    ${activeTab === 'form'
-                      ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                    }`}
-                >
-                  <ListTodo className="w-4 h-4" />
-                  Input Pengeluaran
                 </button>
                 <button
                   onClick={() => setActiveTab('dashboard')}
@@ -152,7 +154,7 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="py-4">
-        {/* Daily Report Input - Available to everyone */}
+        {/* Daily Report Form - Available to everyone */}
         {activeTab === 'daily' && (
           <DailyReportForm 
             user={user} 
@@ -160,30 +162,32 @@ export default function Home() {
           />
         )}
 
-        {/* Admin-only content */}
-        {user.role === 'admin' && (
+        {/* Expense Form - Available to everyone (Kasir can input expenses) */}
+        {activeTab === 'form' && (
           <>
-            {activeTab === 'daily-list' && (
-              <DailyReportList user={user} />
-            )}
-            {activeTab === 'form' && (
-              <>
-                <ExpenseForm user={user} onExpenseAdded={handleExpenseAdded} />
-                <ExpenseList key={refreshKey} user={user} />
-              </>
-            )}
-            {activeTab === 'dashboard' && (
-              <AdminDashboard user={user} />
-            )}
-            {activeTab === 'audit' && (
-              <AuditLog user={user} />
-            )}
-            {activeTab === 'export' && (
-              <div className="max-w-4xl mx-auto p-4">
-                <ExportButtons />
-              </div>
-            )}
+            <ExpenseForm user={user} onExpenseAdded={handleExpenseAdded} />
+            {/* Expense list is only for admin, so conditionally show it */}
+            {user.role === 'admin' && <ExpenseList key={refreshKey} user={user} />}
           </>
+        )}
+
+        {/* Admin-only content */}
+        {user.role === 'admin' && activeTab === 'daily-list' && (
+          <DailyReportList user={user} />
+        )}
+
+        {user.role === 'admin' && activeTab === 'dashboard' && (
+          <AdminDashboard user={user} />
+        )}
+
+        {user.role === 'admin' && activeTab === 'audit' && (
+          <AuditLog user={user} />
+        )}
+
+        {user.role === 'admin' && activeTab === 'export' && (
+          <div className="max-w-4xl mx-auto p-4">
+            <ExportButtons />
+          </div>
         )}
       </div>
     </div>

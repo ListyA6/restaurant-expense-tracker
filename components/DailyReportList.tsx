@@ -189,26 +189,38 @@ export default function DailyReportList({ user }: DailyReportListProps) {
                   </div>
 
                   {/* Summary Cards */}
-                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                     <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg">
-                      <div className="text-xs text-blue-600 dark:text-blue-400">Omset</div>
-                      <div className="font-semibold text-sm">Rp {formatCurrency(report.pos_total)}</div>
+                        <div className="text-xs text-blue-600 dark:text-blue-400">Omset</div>
+                        <div className="font-semibold text-sm">Rp {formatCurrency(report.pos_total)}</div>
                     </div>
-                    <div className="bg-green-50 dark:bg-green-900/20 p-2 rounded-lg">
-                      <div className="text-xs text-green-600 dark:text-green-400">Digital</div>
-                      <div className="font-semibold text-sm">Rp {formatCurrency(digitalTotal)}</div>
+                    <div className="bg-purple-50 dark:bg-purple-900/20 p-2 rounded-lg">
+                        <div className="text-xs text-purple-600 dark:text-purple-400">Uang Ada</div>
+                        <div className="font-semibold text-sm">Rp {formatCurrency(report.cash_amount)}</div>
                     </div>
-                    <div className={`p-2 rounded-lg ${
-                      cashDifference > 0 ? 'bg-green-50 dark:bg-green-900/20' : 
-                      cashDifference < 0 ? 'bg-red-50 dark:bg-red-900/20' : 
-                      'bg-gray-50 dark:bg-gray-700'
+                    <div className="bg-orange-50 dark:bg-orange-900/20 p-2 rounded-lg col-span-2 sm:col-span-1">
+                        <div className="text-xs text-orange-600 dark:text-orange-400">GoFood</div>
+                        <div className="font-semibold text-sm">Rp {formatCurrency(report.gofood_amount || 0)}</div>
+                    </div>
+                    <div className="bg-pink-50 dark:bg-pink-900/20 p-2 rounded-lg col-span-2 sm:col-span-1">
+                        <div className="text-xs text-pink-600 dark:text-pink-400">Shopee</div>
+                        <div className="font-semibold text-sm">Rp {formatCurrency(report.shopee_amount || 0)}</div>
+                    </div>
+                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-2 rounded-lg col-span-2 sm:col-span-1">
+                        <div className="text-xs text-indigo-600 dark:text-indigo-400">QRIS</div>
+                        <div className="font-semibold text-sm">Rp {formatCurrency(report.qris_amount || 0)}</div>
+                    </div>
+                    <div className={`p-2 rounded-lg col-span-2 sm:col-span-1 ${
+                        cashDifference > 0 ? 'bg-green-50 dark:bg-green-900/20' : 
+                        cashDifference < 0 ? 'bg-red-50 dark:bg-red-900/20' : 
+                        'bg-gray-50 dark:bg-gray-700'
                     }`}>
-                      <div className="text-xs text-gray-600 dark:text-gray-400">Selisih</div>
-                      <div className={`font-semibold text-sm ${differenceColor}`}>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">Selisih</div>
+                        <div className={`font-semibold text-sm ${differenceColor}`}>
                         {cashDifference > 0 ? '+' : ''}{cashDifference !== 0 ? `Rp ${formatCurrency(Math.abs(cashDifference))}` : 'Rp 0'}
-                      </div>
+                        </div>
                     </div>
-                  </div>
+                    </div>
 
                   {/* Expanded Details */}
                   {expandedId === report.id && (
