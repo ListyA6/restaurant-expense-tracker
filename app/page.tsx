@@ -7,14 +7,15 @@ import ExpenseList from '@/components/ExpenseList'
 import AdminDashboard from '@/components/AdminDashboard'
 import AuditLog from '@/components/AuditLog'
 import ExportButtons from '@/components/ExportButtons'
+import DailyReportForm from '@/components/DailyReportForm'
 import ThemeToggle from '@/components/ThemeToggle'
 import { User } from '@/types'
-import { LayoutDashboard, ListTodo, History, Download } from 'lucide-react'
+import { LayoutDashboard, ListTodo, History, Download, FileText } from 'lucide-react'
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [activeTab, setActiveTab] = useState<'form' | 'dashboard' | 'audit' | 'export'>('form')
+  const [activeTab, setActiveTab] = useState<'form' | 'dashboard' | 'audit' | 'export' | 'daily'>('form')
 
   useEffect(() => {
     const savedUser = localStorage.getItem('currentUser')
@@ -36,6 +37,10 @@ export default function Home() {
     setRefreshKey(prev => prev + 1)
   }
 
+  const handleReportSubmitted = () => {
+    setRefreshKey(prev => prev + 1)
+  }
+
   if (!user) {
     return <LoginScreen onLogin={handleLogin} />
   }
@@ -46,7 +51,7 @@ export default function Home() {
       <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Pengeluaran Lalafun 🍗
+            Restaurant Expense Tracker
           </h1>
           <div className="flex items-center space-x-4">
             <ThemeToggle />
@@ -63,64 +68,86 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Admin Tabs - Only show for admin */}
-      {user.role === 'admin' && (
-        <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-          <div className="max-w-7xl mx-auto px-4">
-            <div className="flex gap-4 overflow-x-auto pb-0.5">
-              <button
-                onClick={() => setActiveTab('form')}
-                className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
-                  ${activeTab === 'form'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                  }`}
-              >
-                <ListTodo className="w-4 h-4" />
-                Input Pengeluaran
-              </button>
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
-                  ${activeTab === 'dashboard'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                  }`}
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                Dashboard
-              </button>
-              <button
-                onClick={() => setActiveTab('audit')}
-                className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
-                  ${activeTab === 'audit'
-                    ? 'border-purple-600 text-purple-600 dark:text-purple-400 dark:border-purple-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                  }`}
-              >
-                <History className="w-4 h-4" />
-                Riwayat Aktivitas
-              </button>
-              <button
-                onClick={() => setActiveTab('export')}
-                className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
-                  ${activeTab === 'export'
-                    ? 'border-green-600 text-green-600 dark:text-green-400 dark:border-green-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                  }`}
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-            </div>
+      {/* Tabs - Different for admin vs cashier */}
+      <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex gap-4 overflow-x-auto pb-0.5">
+            {/* Daily Report Tab - Available to EVERYONE (admin and cashiers) */}
+            <button
+              onClick={() => setActiveTab('daily')}
+              className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
+                ${activeTab === 'daily'
+                  ? 'border-green-600 text-green-600 dark:text-green-400 dark:border-green-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+            >
+              <FileText className="w-4 h-4" />
+              Laporan Harian
+            </button>
+
+            {/* Admin-only tabs */}
+            {user.role === 'admin' && (
+              <>
+                <button
+                  onClick={() => setActiveTab('form')}
+                  className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
+                    ${activeTab === 'form'
+                      ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                >
+                  <ListTodo className="w-4 h-4" />
+                  Input Pengeluaran
+                </button>
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
+                    ${activeTab === 'dashboard'
+                      ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => setActiveTab('audit')}
+                  className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
+                    ${activeTab === 'audit'
+                      ? 'border-purple-600 text-purple-600 dark:text-purple-400 dark:border-purple-400'
+                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                >
+                  <History className="w-4 h-4" />
+                  Riwayat Aktivitas
+                </button>
+                <button
+                  onClick={() => setActiveTab('export')}
+                  className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap
+                    ${activeTab === 'export'
+                      ? 'border-green-600 text-green-600 dark:text-green-400 dark:border-green-400'
+                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                >
+                  <Download className="w-4 h-4" />
+                  Export
+                </button>
+              </>
+            )}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Main Content */}
       <div className="py-4">
-        {user.role === 'admin' ? (
-          // Admin View with Tabs
+        {activeTab === 'daily' && (
+          <DailyReportForm 
+            user={user} 
+            onReportSubmitted={handleReportSubmitted}
+          />
+        )}
+
+        {user.role === 'admin' && (
           <>
             {activeTab === 'form' && (
               <>
@@ -140,9 +167,6 @@ export default function Home() {
               </div>
             )}
           </>
-        ) : (
-          // Regular User View - only form
-          <ExpenseForm user={user} onExpenseAdded={handleExpenseAdded} />
         )}
       </div>
     </div>
